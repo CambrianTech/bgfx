@@ -28,7 +28,7 @@ namespace bgfx
 {
 #define BGFX_MAIN_THREAD_MAGIC UINT32_C(0x78666762)
 
-#if BGFX_CONFIG_MULTITHREADED
+#if 0
 #	define BGFX_CHECK_MAIN_THREAD() \
 				BX_CHECK(NULL != s_ctx, "Library is not initialized yet."); \
 				BX_CHECK(BGFX_MAIN_THREAD_MAGIC == s_threadIndex, "Must be called from main thread.")
