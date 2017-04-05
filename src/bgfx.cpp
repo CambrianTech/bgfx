@@ -2514,8 +2514,6 @@ namespace bgfx
 
 	bool init(RendererType::Enum _type, uint16_t _vendorId, uint16_t _deviceId, CallbackI* _callback, bx::AllocatorI* _allocator)
 	{
-        printf("HERE\n");
-        
 		if (NULL != s_ctx)
 		{
 			BX_TRACE("bgfx is already initialized.");
