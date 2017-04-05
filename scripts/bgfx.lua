@@ -141,6 +141,11 @@ function bgfxProject(_name, _kind, _defines)
 				"-weak_framework MetalKit",
 			}
 
+		configuration { "ios-*" }
+			buildoptions {
+				"-fembed-bitcode",
+			}
+
 		configuration { "not nacl", "not linux-steamlink" }
 			includedirs {
 				--nacl has GLES2 headers modified...
