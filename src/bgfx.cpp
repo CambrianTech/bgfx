@@ -1694,6 +1694,9 @@ namespace bgfx
 
 			uint32_t size = g_uniformTypeSize[type]*num;
 			const char* data = _uniformBuffer->read(size);
+            
+            if (!data) continue;
+            
 			if (UniformType::Count > type)
 			{
 				if (copy)
