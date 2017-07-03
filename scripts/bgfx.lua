@@ -110,10 +110,10 @@ function bgfxProject(_name, _kind, _defines)
 			configuration {}
 		end
 
-		configuration { "Debug" }
-			defines {
-				"BGFX_CONFIG_DEBUG=1",
-			}
+		-- configuration { "Debug" }
+		-- 	defines {
+		-- 		"BGFX_CONFIG_DEBUG=1",
+		-- 	}
 
 		configuration { "android*" }
 			links {
