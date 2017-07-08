@@ -262,6 +262,28 @@ ios-simulator-release: .build/projects/gmake-ios-simulator ## Build - iOS Simula
 	$(MAKE) -R -C .build/projects/gmake-ios-simulator config=release
 ios-simulator: ios-simulator-debug ios-simulator-release ## Build - iOS Simulator Debug and Release
 
+.build/projects/gmake-ios-simulator-64:
+	$(GENIE) --gcc=ios-simulator gmake
+	mv .build/projects/gmake-ios-simulator .build/projects/gmake-ios-simulator-64
+
+	sed 's/i386/x86_64/g' .build/projects/gmake-ios-simulator-64/bgfx.make > .build/projects/gmake-ios-simulator-64/bgfx.temp
+	mv .build/projects/gmake-ios-simulator-64/bgfx.temp .build/projects/gmake-ios-simulator-64/bgfx.make
+
+	sed 's/ios-simulator\//ios-simulator-64\//g' .build/projects/gmake-ios-simulator-64/bgfx.make > .build/projects/gmake-ios-simulator-64/bgfx.temp
+	mv .build/projects/gmake-ios-simulator-64/bgfx.temp .build/projects/gmake-ios-simulator-64/bgfx.make
+
+	sed 's/i386/x86_64/g' .build/projects/gmake-ios-simulator-64/bx.make > .build/projects/gmake-ios-simulator-64/bx.temp
+	mv .build/projects/gmake-ios-simulator-64/bx.temp .build/projects/gmake-ios-simulator-64/bx.make
+
+	sed 's/ios-simulator\//ios-simulator-64\//g' .build/projects/gmake-ios-simulator-64/bx.make > .build/projects/gmake-ios-simulator-64/bx.temp
+	mv .build/projects/gmake-ios-simulator-64/bx.temp .build/projects/gmake-ios-simulator-64/bx.make
+
+ios-simulator-64-debug: .build/projects/gmake-ios-simulator-64 ## Build - iOS Simulator Debug
+	$(MAKE) -R -C .build/projects/gmake-ios-simulator-64 config=debug
+ios-simulator-64-release: .build/projects/gmake-ios-simulator-64 ## Build - iOS Simulator Release
+	$(MAKE) -R -C .build/projects/gmake-ios-simulator-64 config=release
+ios-simulator-64: ios-simulator-64-debug ios-simulator-64-release ## Build - iOS Simulator Debug and Release
+
 .build/projects/gmake-rpi:
 	$(GENIE) --gcc=rpi gmake
 rpi-debug: .build/projects/gmake-rpi ## Build - RasberryPi Debug
