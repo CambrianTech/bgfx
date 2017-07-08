@@ -54,6 +54,7 @@ projgen: ## Generate project files for all configurations.
 	$(GENIE)              --with-examples                   --gcc=android-x86   gmake
 	$(GENIE)              --with-examples                   --gcc=asmjs         gmake
 	$(GENIE)              --with-examples                   --gcc=ios-arm       gmake
+	$(GENIE)              --with-examples                   --gcc=ios-armv7s    gmake
 	$(GENIE)              --with-examples                   --gcc=ios-arm64     gmake
 	$(GENIE)              --with-examples                   --gcc=ios-simulator gmake
 	$(GENIE)              --with-examples                   --gcc=nacl          gmake
@@ -236,6 +237,14 @@ ios-arm-debug: .build/projects/gmake-ios-arm ## Build - iOS ARM Debug
 ios-arm-release: .build/projects/gmake-ios-arm ## Build - iOS ARM Release
 	$(MAKE) -R -C .build/projects/gmake-ios-arm config=release
 ios-arm: ios-arm-debug ios-arm-release ## Build - iOS ARM Debug and Release
+
+.build/projects/gmake-ios-armv7s:
+	$(GENIE) --gcc=ios-armv7s gmake
+ios-armv7s-debug: .build/projects/gmake-ios-armv7s ## Build - iOS ARM Debug
+	$(MAKE) -R -C .build/projects/gmake-ios-armv7s config=debug
+ios-armv7s-release: .build/projects/gmake-ios-armv7s ## Build - iOS ARM Release
+	$(MAKE) -R -C .build/projects/gmake-ios-armv7s config=release
+ios-armv7s: ios-armv7s-debug ios-armv7s-release ## Build - iOS ARM Debug and Release
 
 .build/projects/gmake-ios-arm64:
 	$(GENIE) --gcc=ios-arm64 gmake
