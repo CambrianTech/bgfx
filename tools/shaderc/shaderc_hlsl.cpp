@@ -172,6 +172,8 @@ namespace bgfx { namespace hlsl
 		{ bgfx::Attrib::Bitangent, "BITANGENT",    0 },
 		{ bgfx::Attrib::Color0,    "COLOR",        0 },
 		{ bgfx::Attrib::Color1,    "COLOR",        1 },
+		{ bgfx::Attrib::Color2,    "COLOR",        2 },
+		{ bgfx::Attrib::Color3,    "COLOR",        3 },
 		{ bgfx::Attrib::Indices,   "BLENDINDICES", 0 },
 		{ bgfx::Attrib::Weight,    "BLENDWEIGHT",  0 },
 		{ bgfx::Attrib::TexCoord0, "TEXCOORD",     0 },
@@ -190,7 +192,7 @@ namespace bgfx { namespace hlsl
 		for (uint32_t ii = 0; ii < bgfx::Attrib::Count; ++ii)
 		{
 			const RemapInputSemantic& ris = s_remapInputSemantic[ii];
-			if (0 == strcmp(ris.m_name, _name)
+			if (0 == bx::strCmp(ris.m_name, _name)
 			&&  ris.m_index == _index)
 			{
 				return ris;
@@ -421,7 +423,7 @@ namespace bgfx { namespace hlsl
 					, spd.Register
 					);
 
-				const RemapInputSemantic& ris = findInputSemantic(spd.SemanticName, spd.SemanticIndex);
+				const RemapInputSemantic& ris = findInputSemantic(spd.SemanticName, uint8_t(spd.SemanticIndex) );
 				if (ris.m_attr != bgfx::Attrib::Count)
 				{
 					_attrs[_numAttrs] = bgfx::attribToId(ris.m_attr);
@@ -475,8 +477,8 @@ namespace bgfx { namespace hlsl
 								Uniform un;
 								un.name = varDesc.Name;
 								un.type = uniformType;
-								un.num = constDesc.Elements;
-								un.regIndex = varDesc.StartOffset;
+								un.num = uint8_t(constDesc.Elements);
+								un.regIndex = uint16_t(varDesc.StartOffset);
 								un.regCount = BX_ALIGN_16(varDesc.Size) / 16;
 								_uniforms.push_back(un);
 
@@ -520,15 +522,15 @@ namespace bgfx { namespace hlsl
 						, bindDesc.BindCount
 						);
 
-					const char * end = strstr(bindDesc.Name, "Sampler");
+					const char * end = bx::strFind(bindDesc.Name, "Sampler");
 					if (NULL != end)
 					{
 						Uniform un;
 						un.name.assign(bindDesc.Name, (end - bindDesc.Name) );
 						un.type = UniformType::Enum(BGFX_UNIFORM_SAMPLERBIT | UniformType::Int1);
 						un.num = 1;
-						un.regIndex = bindDesc.BindPoint;
-						un.regCount = bindDesc.BindCount;
+						un.regIndex = uint16_t(bindDesc.BindPoint);
+						un.regCount = uint16_t(bindDesc.BindCount);
 						_uniforms.push_back(un);
 					}
 				}
@@ -624,7 +626,7 @@ namespace bgfx { namespace hlsl
 			int32_t end    = INT32_MAX;
 
 			bool found = false
-				|| 2 == sscanf(log, "(%u,%u):", &line, &column)
+				|| 2 == sscanf(log, "(%u,%u):",  &line, &column)
 				|| 2 == sscanf(log, " :%u:%u: ", &line, &column)
 				;
 
@@ -666,36 +668,43 @@ namespace bgfx { namespace hlsl
 			if (_firstPass
 			&&  unusedUniforms.size() > 0)
 			{
-				const size_t strLength = strlen("uniform");
+				const size_t strLength = bx::strLen("uniform");
 
 				// first time through, we just find unused uniforms and get rid of them
 				std::string output;
+				bx::Error err;
 				LineReader reader(_code.c_str() );
-				while (!reader.isEof() )
+				while (err.isOk() )
 				{
-					std::string line = reader.getLine();
-					for (UniformNameList::iterator it = unusedUniforms.begin(), itEnd = unusedUniforms.end(); it != itEnd; ++it)
+					char str[4096];
+					int32_t len = bx::read(&reader, str, BX_COUNTOF(str), &err);
+					if (err.isOk() )
 					{
-						size_t index = line.find("uniform ");
-						if (index == std::string::npos)
+						std::string strLine(str, len);
+
+						for (UniformNameList::iterator it = unusedUniforms.begin(), itEnd = unusedUniforms.end(); it != itEnd; ++it)
 						{
-							continue;
+							size_t index = strLine.find("uniform ");
+							if (index == std::string::npos)
+							{
+								continue;
+							}
+
+							// matching lines like:  uniform u_name;
+							// we want to replace "uniform" with "static" so that it's no longer
+							// included in the uniform blob that the application must upload
+							// we can't just remove them, because unused functions might still reference
+							// them and cause a compile error when they're gone
+							if (!!bx::findIdentifierMatch(strLine.c_str(), it->c_str() ) )
+							{
+								strLine = strLine.replace(index, strLength, "static");
+								unusedUniforms.erase(it);
+								break;
+							}
 						}
 
-						// matching lines like:  uniform u_name;
-						// we want to replace "uniform" with "static" so that it's no longer
-						// included in the uniform blob that the application must upload
-						// we can't just remove them, because unused functions might still reference
-						// them and cause a compile error when they're gone
-						if (!!bx::findIdentifierMatch(line.c_str(), it->c_str() ) )
-						{
-							line = line.replace(index, strLength, "static");
-							unusedUniforms.erase(it);
-							break;
-						}
+						output += strLine;
 					}
-
-					output += line;
 				}
 
 				// recompile with the unused uniforms converted to statics
@@ -714,7 +723,7 @@ namespace bgfx { namespace hlsl
 				uint8_t nameSize = (uint8_t)un.name.size();
 				bx::write(_writer, nameSize);
 				bx::write(_writer, un.name.c_str(), nameSize);
-				uint8_t type = un.type | fragmentBit;
+				uint8_t type = uint8_t(un.type | fragmentBit);
 				bx::write(_writer, type);
 				bx::write(_writer, un.num);
 				bx::write(_writer, un.regIndex);
@@ -747,7 +756,7 @@ namespace bgfx { namespace hlsl
 		}
 
 		{
-			uint16_t shaderSize = (uint16_t)code->GetBufferSize();
+			uint32_t shaderSize = uint32_t(code->GetBufferSize() );
 			bx::write(_writer, shaderSize);
 			bx::write(_writer, code->GetBufferPointer(), shaderSize);
 			uint8_t nul = 0;

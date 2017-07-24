@@ -7,6 +7,13 @@
 #include "bgfx_utils.h"
 #include <entry/input.h>
 #include <bx/string.h>
+#include "imgui/imgui.h"
+
+void cmdCreateWindow(const void* _userData);
+void cmdDestroyWindow(const void* _userData);
+
+namespace
+{
 
 #define MAX_WINDOWS 8
 
@@ -59,19 +66,21 @@ static const uint16_t s_cubeIndices[36] =
 	6, 3, 7,
 };
 
-void cmdCreateWindow(const void* _userData);
-void cmdDestroyWindow(const void* _userData);
-
 class ExampleWindows : public entry::AppI
 {
 public:
-	void init(int _argc, char** _argv) BX_OVERRIDE
+	ExampleWindows(const char* _name, const char* _description)
+		: entry::AppI(_name, _description)
+	{
+	}
+
+	void init(int32_t _argc, const char* const* _argv, uint32_t _width, uint32_t _height) override
 	{
 		Args args(_argc, _argv);
 
-		m_width  = 1280;
-		m_height = 720;
-		m_debug  = BGFX_DEBUG_TEXT;
+		m_width  = _width;
+		m_height = _height;
+		m_debug  = BGFX_DEBUG_NONE;
 		m_reset  = BGFX_RESET_VSYNC;
 
 		bgfx::init(args.m_type, args.m_pciId);
@@ -126,25 +135,29 @@ public:
 
 		m_timeOffset = bx::getHPCounter();
 
-		memset(m_fbh, 0xff, sizeof(m_fbh) );
+		bx::memSet(m_fbh, 0xff, sizeof(m_fbh) );
+
+		imguiCreate();
 	}
 
-	virtual int shutdown() BX_OVERRIDE
+	virtual int shutdown() override
 	{
+		imguiDestroy();
+
 		for (uint32_t ii = 0; ii < MAX_WINDOWS; ++ii)
 		{
 			if (bgfx::isValid(m_fbh[ii]) )
 			{
-				bgfx::destroyFrameBuffer(m_fbh[ii]);
+				bgfx::destroy(m_fbh[ii]);
 			}
 		}
 
 		BX_FREE(entry::getAllocator(), m_bindings);
 
 		// Cleanup.
-		bgfx::destroyIndexBuffer(m_ibh);
-		bgfx::destroyVertexBuffer(m_vbh);
-		bgfx::destroyProgram(m_program);
+		bgfx::destroy(m_ibh);
+		bgfx::destroy(m_vbh);
+		bgfx::destroy(m_program);
 
 		// Shutdown bgfx.
 		bgfx::shutdown();
@@ -152,11 +165,27 @@ public:
 		return 0;
 	}
 
-	bool update() BX_OVERRIDE
+	bool update() override
 	{
 		entry::WindowState state;
 		if (!entry::processWindowEvents(state, m_debug, m_reset) )
 		{
+			m_mouseState = state.m_mouse;
+
+			imguiBeginFrame(m_mouseState.m_mx
+				,  m_mouseState.m_my
+				, (m_mouseState.m_buttons[entry::MouseButton::Left  ] ? IMGUI_MBUT_LEFT   : 0)
+				| (m_mouseState.m_buttons[entry::MouseButton::Right ] ? IMGUI_MBUT_RIGHT  : 0)
+				| (m_mouseState.m_buttons[entry::MouseButton::Middle] ? IMGUI_MBUT_MIDDLE : 0)
+				,  m_mouseState.m_mz
+				, uint16_t(m_width)
+				, uint16_t(m_height)
+				);
+
+			showExampleDialog(this);
+
+			imguiEndFrame();
+
 			if (isValid(state.m_handle) )
 			{
 				if (0 == state.m_handle.idx)
@@ -177,8 +206,8 @@ public:
 						// frame buffer must be recreated.
 						if (bgfx::isValid(m_fbh[viewId]) )
 						{
-							bgfx::destroyFrameBuffer(m_fbh[viewId]);
-							m_fbh[viewId].idx = bgfx::invalidHandle;
+							bgfx::destroy(m_fbh[viewId]);
+							m_fbh[viewId].idx = bgfx::kInvalidHandle;
 						}
 
 						win.m_nwh    = state.m_nwh;
@@ -187,7 +216,7 @@ public:
 
 						if (NULL != win.m_nwh)
 						{
-							m_fbh[viewId] = bgfx::createFrameBuffer(win.m_nwh, win.m_width, win.m_height);
+							m_fbh[viewId] = bgfx::createFrameBuffer(win.m_nwh, uint16_t(win.m_width), uint16_t(win.m_height) );
 						}
 						else
 						{
@@ -204,16 +233,16 @@ public:
 			bx::mtxLookAt(view, eye, at);
 
 			float proj[16];
-			bx::mtxProj(proj, 60.0f, float(m_width)/float(m_height), 0.1f, 100.0f);
+			bx::mtxProj(proj, 60.0f, float(m_width)/float(m_height), 0.1f, 100.0f, bgfx::getCaps()->homogeneousDepth);
 
 			bgfx::setViewTransform(0, view, proj);
-			bgfx::setViewRect(0, 0, 0, m_width, m_height);
+			bgfx::setViewRect(0, 0, 0, uint16_t(m_width), uint16_t(m_height) );
 			// This dummy draw call is here to make sure that view 0 is cleared
 			// if no other draw calls are submitted to view 0.
 			bgfx::touch(0);
 
 			// Set view and projection matrix for view 0.
-			for (uint32_t ii = 1; ii < MAX_WINDOWS; ++ii)
+			for (uint8_t ii = 1; ii < MAX_WINDOWS; ++ii)
 			{
 				bgfx::setViewTransform(ii, view, proj);
 				bgfx::setViewFrameBuffer(ii, m_fbh[ii]);
@@ -221,12 +250,12 @@ public:
 				if (!bgfx::isValid(m_fbh[ii]) )
 				{
 					// Set view to default viewport.
-					bgfx::setViewRect(ii, 0, 0, m_width, m_height);
+					bgfx::setViewRect(ii, 0, 0, uint16_t(m_width), uint16_t(m_height) );
 					bgfx::setViewClear(ii, BGFX_CLEAR_NONE);
 				}
 				else
 				{
-					bgfx::setViewRect(ii, 0, 0, m_windows[ii].m_width, m_windows[ii].m_height);
+					bgfx::setViewRect(ii, 0, 0, uint16_t(m_windows[ii].m_width), uint16_t(m_windows[ii].m_height) );
 					bgfx::setViewClear(ii
 						, BGFX_CLEAR_COLOR|BGFX_CLEAR_DEPTH
 						, 0x303030ff
@@ -237,19 +266,7 @@ public:
 			}
 
 			int64_t now = bx::getHPCounter();
-			static int64_t last = now;
-			const int64_t frameTime = now - last;
-			last = now;
-			const double freq = double(bx::getHPFrequency() );
-			const double toMs = 1000.0/freq;
-
 			float time = (float)( (now-m_timeOffset)/double(bx::getHPFrequency() ) );
-
-			// Use debug font to print information about this example.
-			bgfx::dbgTextClear();
-			bgfx::dbgTextPrintf(0, 1, 0x4f, "bgfx/examples/22-windows");
-			bgfx::dbgTextPrintf(0, 2, 0x6f, "Description: Rendering into multiple windows.");
-			bgfx::dbgTextPrintf(0, 3, 0x0f, "Frame: % 7.3f[ms]", double(frameTime)*toMs);
 
 			if (NULL != m_bindings)
 			{
@@ -258,7 +275,7 @@ public:
 			else
 			{
 				bool blink = uint32_t(time*3.0f)&1;
-				bgfx::dbgTextPrintf(0, 5, blink ? 0x1f : 0x01, " Multiple windows is not supported by `%s` renderer. ", bgfx::getRendererName(bgfx::getCaps()->rendererType) );
+				bgfx::dbgTextPrintf(0, 0, blink ? 0x1f : 0x01, " Multiple windows is not supported by `%s` renderer. ", bgfx::getRendererName(bgfx::getCaps()->rendererType) );
 			}
 
 			uint32_t count = 0;
@@ -278,7 +295,7 @@ public:
 					bgfx::setTransform(mtx);
 
 					// Set vertex and index buffer.
-					bgfx::setVertexBuffer(m_vbh);
+					bgfx::setVertexBuffer(0, m_vbh);
 					bgfx::setIndexBuffer(m_ibh);
 
 					// Set render states.
@@ -318,8 +335,8 @@ public:
 		{
 			if (bgfx::isValid(m_fbh[ii]) )
 			{
-				bgfx::destroyFrameBuffer(m_fbh[ii]);
-				m_fbh[ii].idx = bgfx::invalidHandle;
+				bgfx::destroy(m_fbh[ii]);
+				m_fbh[ii].idx = bgfx::kInvalidHandle;
 
 				// Flush destruction of swap chain before destroying window!
 				bgfx::frame();
@@ -334,6 +351,8 @@ public:
 			}
 		}
 	}
+
+	entry::MouseState m_mouseState;
 
 	uint32_t m_width;
 	uint32_t m_height;
@@ -352,7 +371,9 @@ public:
 	int64_t m_timeOffset;
 };
 
-ENTRY_IMPLEMENT_MAIN(ExampleWindows);
+} // namespace
+
+ENTRY_IMPLEMENT_MAIN(ExampleWindows, "22-windows", "Rendering into multiple windows.");
 
 void cmdCreateWindow(const void* _userData)
 {

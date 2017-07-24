@@ -11,7 +11,6 @@
 #include <bx/spscqueue.h>
 
 #include "entry.h"
-#include <string.h> // memcpy
 
 #ifndef ENTRY_CONFIG_USE_NOOP
 #	define ENTRY_CONFIG_USE_NOOP (BX_PLATFORM_QNX)
@@ -68,7 +67,7 @@ namespace entry
 		static void static_deallocate(void* _ptr, size_t /*_bytes*/);
 	};
 
-	int main(int _argc, char** _argv);
+	int main(int _argc, const char* const* _argv);
 
 	char keyToAscii(Key::Enum _key, uint8_t _modifiers);
 
@@ -199,7 +198,7 @@ namespace entry
 		{
 			CharEvent* ev = new CharEvent(_handle);
 			ev->m_len = _len;
-			memcpy(ev->m_char, _char, 4);
+			bx::memCopy(ev->m_char, _char, 4);
 			m_queue.push(ev);
 		}
 
@@ -298,7 +297,7 @@ namespace entry
 		}
 
 	private:
-		bx::SpScUnboundedQueue<Event> m_queue;
+		bx::SpScUnboundedQueueT<Event> m_queue;
 	};
 
 } // namespace entry

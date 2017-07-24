@@ -818,7 +818,7 @@ namespace bgfx { namespace mtl
 			, m_pixelFormatHash(0)
 			, m_num(0)
 		{
-			m_depthHandle.idx = invalidHandle;
+			m_depthHandle.idx = kInvalidHandle;
 		}
 
 		void create(uint8_t _num, const Attachment* _attachment);
@@ -896,6 +896,7 @@ namespace bgfx { namespace mtl
 		void begin(RenderCommandEncoder& _rce, Frame* _render, OcclusionQueryHandle _handle);
 		void end(RenderCommandEncoder& _rce);
 		void resolve(Frame* _render, bool _wait = false);
+		void invalidate(OcclusionQueryHandle _handle);
 
 		struct Query
 		{

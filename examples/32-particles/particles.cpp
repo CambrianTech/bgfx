@@ -17,6 +17,9 @@
 
 #include <ps/particle_system.h>
 
+namespace
+{
+
 static const char* s_shapeNames[] =
 {
 	"Sphere",
@@ -105,7 +108,7 @@ struct Emitter
 		psUpdateEmitter(m_handle, &m_uniforms);
 	}
 
-	void imgui(const float* _view, const float* _proj)
+	void imgui()
 	{
 //		if (ImGui::CollapsingHeader("General") )
 		{
@@ -191,15 +194,16 @@ struct Emitter
 			ImGui::Text("Color:");
 
 			ImGui::Combo("RGBA Ease", (int*)&m_uniforms.m_easeRgba, s_easeFuncName, BX_COUNTOF(s_easeFuncName) );
-			ImGui::ColorEdit4("RGBA0", &m_uniforms.m_rgba[0], true);
-			ImGui::ColorEdit4("RGBA1", &m_uniforms.m_rgba[1], true);
-			ImGui::ColorEdit4("RGBA2", &m_uniforms.m_rgba[2], true);
-			ImGui::ColorEdit4("RGBA3", &m_uniforms.m_rgba[3], true);
-			ImGui::ColorEdit4("RGBA4", &m_uniforms.m_rgba[4], true);
+			ImGui::ColorWheel("RGBA0", &m_uniforms.m_rgba[0], 0.3f);
+			ImGui::ColorWheel("RGBA1", &m_uniforms.m_rgba[1], 0.3f);
+			ImGui::ColorWheel("RGBA2", &m_uniforms.m_rgba[2], 0.3f);
+			ImGui::ColorWheel("RGBA3", &m_uniforms.m_rgba[3], 0.3f);
+			ImGui::ColorWheel("RGBA4", &m_uniforms.m_rgba[4], 0.3f);
 		}
+	}
 
-		ImGui::End();
-
+	void gizmo(const float* _view, const float* _proj)
+	{
 		float mtx[16];
 		bx::mtxSRT(mtx
 				, 1.0f, 1.0f, 1.0f
@@ -207,11 +211,14 @@ struct Emitter
 				, m_uniforms.m_position[0], m_uniforms.m_position[1], m_uniforms.m_position[2]
 				);
 
+		ImGuiIO& io = ImGui::GetIO();
+		ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
 		ImGuizmo::Manipulate(
 				_view
 				, _proj
-				, ImGuizmo::OPERATION::TRANSLATE
-				, ImGuizmo::MODE::LOCAL
+				, ImGuizmo::TRANSLATE
+				, ImGuizmo::LOCAL
 				, mtx
 				);
 
@@ -220,15 +227,21 @@ struct Emitter
 	}
 };
 
-class Particles : public entry::AppI
+class ExampleParticles : public entry::AppI
 {
-	void init(int _argc, char** _argv) BX_OVERRIDE
+public:
+	ExampleParticles(const char* _name, const char* _description)
+		: entry::AppI(_name, _description)
+	{
+	}
+
+	void init(int32_t _argc, const char* const* _argv, uint32_t _width, uint32_t _height) override
 	{
 		Args args(_argc, _argv);
 
-		m_width  = 1280;
-		m_height = 720;
-		m_debug  = BGFX_DEBUG_TEXT;
+		m_width  = _width;
+		m_height = _height;
+		m_debug  = BGFX_DEBUG_NONE;
 		m_reset  = BGFX_RESET_VSYNC;
 
 		bgfx::init(args.m_type, args.m_pciId);
@@ -249,9 +262,23 @@ class Particles : public entry::AppI
 
 		psInit();
 
+		bimg::ImageContainer* image = imageLoad(
+			  "textures/particle.ktx"
+			, bgfx::TextureFormat::BGRA8
+			);
+
+		EmitterSpriteHandle sprite = psCreateSprite(
+				  uint16_t(image->m_width)
+				, uint16_t(image->m_height)
+				, image->m_data
+				);
+
+		bimg::imageFree(image);
+
 		for (uint32_t ii = 0; ii < BX_COUNTOF(m_emitter); ++ii)
 		{
 			m_emitter[ii].create();
+			m_emitter[ii].m_uniforms.m_handle = sprite;
 		}
 
 		imguiCreate();
@@ -265,7 +292,7 @@ class Particles : public entry::AppI
 		m_timeOffset = bx::getHPCounter();
 	}
 
-	virtual int shutdown() BX_OVERRIDE
+	virtual int shutdown() override
 	{
 		for (uint32_t ii = 0; ii < BX_COUNTOF(m_emitter); ++ii)
 		{
@@ -286,12 +313,12 @@ class Particles : public entry::AppI
 		return 0;
 	}
 
-	bool update() BX_OVERRIDE
+	bool update() override
 	{
 		if (!entry::processEvents(m_width, m_height, m_debug, m_reset, &m_mouseState) )
 		{
 			// Set view 0 default viewport.
-			bgfx::setViewRect(0, 0, 0, m_width, m_height);
+			bgfx::setViewRect(0, 0, 0, uint16_t(m_width), uint16_t(m_height) );
 
 			bgfx::touch(0);
 
@@ -300,16 +327,8 @@ class Particles : public entry::AppI
 			const int64_t frameTime = now - last;
 			last = now;
 			const double freq = double(bx::getHPFrequency() );
-			const double toMs = 1000.0/freq;
 			const float deltaTime = float(frameTime/freq);
 
-			// Use debug font to print information about this example.
-			bgfx::dbgTextClear();
-			bgfx::dbgTextPrintf(0, 1, 0x4f, "bgfx/examples/32-particles");
-			bgfx::dbgTextPrintf(0, 2, 0x6f, "Description: Particles.");
-			bgfx::dbgTextPrintf(0, 3, 0x0f, "Frame: % 7.3f[ms]", double(frameTime)*toMs);
-
-			// Update camera.George RR Martin
 			cameraUpdate(deltaTime, m_mouseState);
 
 			float view[16];
@@ -329,10 +348,10 @@ class Particles : public entry::AppI
 			}
 			else
 			{
-				bx::mtxProj(proj, 60.0f, float(m_width)/float(m_height), 0.1f, 100.0f);
+				bx::mtxProj(proj, 60.0f, float(m_width)/float(m_height), 0.1f, 100.0f, bgfx::getCaps()->homogeneousDepth);
 
 				bgfx::setViewTransform(0, view, proj);
-				bgfx::setViewRect(0, 0, 0, m_width, m_height);
+				bgfx::setViewRect(0, 0, 0, uint16_t(m_width), uint16_t(m_height) );
 			}
 
 			imguiBeginFrame(
@@ -342,13 +361,19 @@ class Particles : public entry::AppI
 				| (m_mouseState.m_buttons[entry::MouseButton::Right ] ? IMGUI_MBUT_RIGHT  : 0)
 				| (m_mouseState.m_buttons[entry::MouseButton::Middle] ? IMGUI_MBUT_MIDDLE : 0)
 				,  m_mouseState.m_mz
-				, m_width
-				, m_height
+				, uint16_t(m_width)
+				, uint16_t(m_height)
 				);
 
-			ImGui::Begin("Properties"
+			showExampleDialog(this);
+
+			ImGui::SetNextWindowPos(
+				  ImVec2(m_width - m_width / 4.0f - 10.0f, 10.0f)
+				, ImGuiSetCond_FirstUseEver
+				);
+			ImGui::Begin("Settings"
 				, NULL
-				, ImVec2(400.0f, 600.0f)
+				, ImVec2(m_width / 4.0f, m_height - 20.0f)
 				, ImGuiWindowFlags_AlwaysAutoResize
 				);
 
@@ -374,7 +399,11 @@ class Particles : public entry::AppI
 				ImGui::RadioButton(name, &currentEmitter, ii);
 			}
 
-			m_emitter[currentEmitter].imgui(view, proj);
+			m_emitter[currentEmitter].imgui();
+
+			ImGui::End();
+
+			m_emitter[currentEmitter].gizmo(view, proj);
 
 			imguiEndFrame();
 
@@ -423,4 +452,6 @@ class Particles : public entry::AppI
 	Emitter m_emitter[4];
 };
 
-ENTRY_IMPLEMENT_MAIN(Particles);
+} // namespace
+
+ENTRY_IMPLEMENT_MAIN(ExampleParticles, "32-particles", "Particles.");

@@ -92,7 +92,7 @@ namespace glslang {
 
 class TPpToken {
 public:
-    TPpToken() : space(false), ival(0), dval(0.0), i64val(0)
+    TPpToken() : space(false), i64val(0)
     {
         loc.init();
         name[0] = 0;
@@ -108,10 +108,14 @@ public:
     bool operator!=(const TPpToken& right) { return ! operator==(right); }
 
     TSourceLoc loc;
-    bool   space;  // true if a space (for white space or a removed comment) should also be recognized, in front of the token returned
-    int    ival;
-    double dval;
-    long long i64val;
+    bool space;  // true if a space (for white space or a removed comment) should also be recognized, in front of the token returned
+
+    union {
+        int ival;
+        double dval;
+        long long i64val;
+    };
+
     char   name[MaxTokenLength + 1];
 };
 
@@ -196,6 +200,7 @@ public:
         virtual void ungetch() = 0;
         virtual bool peekPasting() { return false; }          // true when about to see ##
         virtual bool endOfReplacementList() { return false; } // true when at the end of a macro replacement list (RHS of #define)
+        virtual bool isMacroInput() { return false; }
 
         // Will be called when we start reading tokens from this instance
         virtual void notifyActivated() {}
@@ -220,8 +225,26 @@ public:
         inputStack.pop_back();
     }
 
-    struct TokenStream {
+    //
+    // From PpTokens.cpp
+    //
+
+    class TokenStream {
+    public:
         TokenStream() : current(0) { }
+
+        void putToken(int token, TPpToken* ppToken);
+        int getToken(TParseContextBase&, TPpToken*);
+        bool atEnd() { return current >= data.size(); }
+        bool peekTokenizedPasting(bool lastTokenPastes);
+        bool peekUntokenizedPasting();
+        void reset() { current = 0; }
+
+    protected:
+        void putSubtoken(char);
+        int getSubtoken();
+        void ungetSubtoken();
+
         TVector<unsigned char> data;
         size_t current;
     };
@@ -284,6 +307,7 @@ protected:
     void ungetChar() { inputStack.back()->ungetch(); }
     bool peekPasting() { return !inputStack.empty() && inputStack.back()->peekPasting(); }
     bool endOfReplacementList() { return inputStack.empty() || inputStack.back()->endOfReplacementList(); }
+    bool isMacroInput() { return inputStack.size() > 0 && inputStack.back()->isMacroInput(); }
 
     static const int maxIfNesting = 64;
 
@@ -306,14 +330,14 @@ protected:
         virtual int getch() override { assert(0); return EndOfInput; }
         virtual void ungetch() override { assert(0); }
         bool peekPasting() override { return prepaste; }
-        bool endOfReplacementList() override { return mac->body.current >= mac->body.data.size(); }
+        bool endOfReplacementList() override { return mac->body.atEnd(); }
+        bool isMacroInput() override { return true; }
 
         MacroSymbol *mac;
         TVector<TokenStream*> args;
         TVector<TokenStream*> expandedArgs;
 
     protected:
-        bool peekMacPasting();
         bool prepaste;         // true if we are just before ##
         bool postpaste;        // true if we are right after ##
     };
@@ -375,22 +399,16 @@ protected:
     //
     // From PpTokens.cpp
     //
-    void lAddByte(TokenStream&, unsigned char fVal);
-    int lReadByte(TokenStream&);
-    void lUnreadByte(TokenStream&);
-    void RecordToken(TokenStream&, int token, TPpToken* ppToken);
-    void RewindTokenStream(TokenStream&);
-    int ReadToken(TokenStream&, TPpToken*);
     void pushTokenStreamInput(TokenStream&, bool pasting = false);
     void UngetToken(int token, TPpToken*);
 
     class tTokenInput : public tInput {
     public:
         tTokenInput(TPpContext* pp, TokenStream* t, bool prepasting) : tInput(pp), tokens(t), lastTokenPastes(prepasting) { }
-        virtual int scan(TPpToken *) override;
+        virtual int scan(TPpToken *ppToken) override { return tokens->getToken(pp->parseContext, ppToken); }
         virtual int getch() override { assert(0); return EndOfInput; }
         virtual void ungetch() override { assert(0); }
-        virtual bool peekPasting() override;
+        virtual bool peekPasting() override { return tokens->peekTokenizedPasting(lastTokenPastes); }
     protected:
         TokenStream* tokens;
         bool lastTokenPastes;     // true if the last token in the input is to be pasted, rather than consumed as a token
@@ -573,6 +591,7 @@ protected:
     int ScanFromString(char* s);
     void missingEndifCheck();
     int lFloatConst(int len, int ch, TPpToken* ppToken);
+    int characterLiteral(TPpToken* ppToken);
 
     void push_include(TShader::Includer::IncludeResult* result)
     {

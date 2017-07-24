@@ -86,7 +86,7 @@ namespace entry
 	struct MainThreadEntry
 	{
 		int m_argc;
-		char** m_argv;
+		const char* const* m_argv;
 
 		static int32_t threadFunc(void* _userData);
 	};
@@ -96,7 +96,7 @@ namespace entry
 		Context()
 			: m_window(NULL)
 		{
-			memset(m_value, 0, sizeof(m_value) );
+			bx::memSet(m_value, 0, sizeof(m_value) );
 
 			// Deadzone values from xinput.h
 			m_deadzone[GamepadAxis::LeftX ] =
@@ -119,9 +119,9 @@ namespace entry
 				, 0
 				);
 
-			const char* argv[1] = { "android.so" };
+			const char* const argv[1] = { "android.so" };
 			m_mte.m_argc = 1;
-			m_mte.m_argv = const_cast<char**>(argv);
+			m_mte.m_argv = argv;
 
 			while (0 == m_app->destroyRequested)
 			{
