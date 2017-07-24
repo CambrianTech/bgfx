@@ -247,6 +247,12 @@ ios-simulator: ios-simulator-debug ios-simulator-release ## Build - iOS Simulato
 	sed 's/ios-simulator\//ios-simulator-64\//g' .build/projects/gmake-ios-simulator-64/bx.make > .build/projects/gmake-ios-simulator-64/bx.temp
 	mv .build/projects/gmake-ios-simulator-64/bx.temp .build/projects/gmake-ios-simulator-64/bx.make
 
+	sed 's/i386/x86_64/g' .build/projects/gmake-ios-simulator-64/bimg.make > .build/projects/gmake-ios-simulator-64/bimg.temp
+	mv .build/projects/gmake-ios-simulator-64/bimg.temp .build/projects/gmake-ios-simulator-64/bimg.make
+
+	sed 's/ios-simulator\//ios-simulator-64\//g' .build/projects/gmake-ios-simulator-64/bimg.make > .build/projects/gmake-ios-simulator-64/bimg.temp
+	mv .build/projects/gmake-ios-simulator-64/bimg.temp .build/projects/gmake-ios-simulator-64/bimg.make
+
 ios-simulator-64-debug: .build/projects/gmake-ios-simulator-64 ## Build - iOS Simulator Debug
 	$(MAKE) -R -C .build/projects/gmake-ios-simulator-64 config=debug
 ios-simulator-64-release: .build/projects/gmake-ios-simulator-64 ## Build - iOS Simulator Release
