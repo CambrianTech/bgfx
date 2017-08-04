@@ -70,6 +70,27 @@ android-arm-release: .build/projects/gmake-android-arm ## Build - Android ARM Re
 	$(MAKE) -R -C .build/projects/gmake-android-arm config=release
 android-arm: android-arm-debug android-arm-release ## Build - Android ARM Debug and Release
 
+.build/projects/gmake-android-arm64:
+	$(GENIE) --gcc=android-arm gmake
+	mv .build/projects/gmake-android-arm .build/projects/gmake-android-arm64
+
+	# sed 's/i386/x86_64/g' .build/projects/gmake-ios-simulator-64/bgfx.make > .build/projects/gmake-ios-simulator-64/bgfx.temp
+	# mv .build/projects/gmake-ios-simulator-64/bgfx.temp .build/projects/gmake-ios-simulator-64/bgfx.make
+
+	# sed 's/ios-simulator\//ios-simulator-64\//g' .build/projects/gmake-ios-simulator-64/bgfx.make > .build/projects/gmake-ios-simulator-64/bgfx.temp
+	# mv .build/projects/gmake-ios-simulator-64/bgfx.temp .build/projects/gmake-ios-simulator-64/bgfx.make
+
+	# sed 's/i386/x86_64/g' .build/projects/gmake-ios-simulator-64/bx.make > .build/projects/gmake-ios-simulator-64/bx.temp
+	# mv .build/projects/gmake-ios-simulator-64/bx.temp .build/projects/gmake-ios-simulator-64/bx.make
+
+	# sed 's/ios-simulator\//ios-simulator-64\//g' .build/projects/gmake-ios-simulator-64/bx.make > .build/projects/gmake-ios-simulator-64/bx.temp
+	# mv .build/projects/gmake-ios-simulator-64/bx.temp .build/projects/gmake-ios-simulator-64/bx.make
+android-arm64-debug: .build/projects/gmake-android-arm64 ## Build - iOS Simulator Debug
+	$(MAKE) -R -C .build/projects/gmake-android-arm64 config=debug
+android-arm64-release: .build/projects/gmake-android-arm64 ## Build - iOS Simulator Release
+	$(MAKE) -R -C .build/projects/gmake-android-arm64 config=release
+android-arm64: ios-simulator-64-debug android-arm64-release ## Build - iOS Simulator Debug and Release
+
 .build/projects/gmake-android-mips:
 	$(GENIE) --gcc=android-mips gmake
 android-mips-debug: .build/projects/gmake-android-mips ## Build - Android MIPS Debug
