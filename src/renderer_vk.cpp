@@ -1273,6 +1273,7 @@ VK_IMPORT_DEVICE
 				sci.sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
 				sci.pNext = NULL;
 				sci.flags = 0;
+                sci.window = (ANativeWindow *) g_platformData.nwh;
 				result = vkCreateAndroidSurfaceKHR(m_instance, &sci, m_allocatorCb, &m_surface);
 			}
 #elif BX_PLATFORM_LINUX
